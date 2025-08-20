@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  netguard-app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: netguard-app
+    restart: unless-stopped
+    network_mode: "host"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://netguard:netguard_pass_2024@localhost:5432/netguard_db
+      - JWT_SECRET=netguard_super_secret_jwt_key_2024
+      - ADMIN_DEFAULT_PASSWORD=admin123
+      - PORT=80
+    volumes:
+      - ./data/uploads:/app/uploads
+      - ./data/configs:/app/configs
+      - ./data/logs:/app/logs
+      - ./squid_config:/etc/squid
+    depends_on:
+      - database
+      - proxy
+
+  database:
+    image: postgres:14
+    container_name: netguard-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=netguard
+      - POSTGRES_PASSWORD=netguard_pass_2024
+      - POSTGRES_DB=netguard_db
+      - POSTGRES_INITDB_ARGS="--encoding=UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - netguard-network
+
+  proxy:
+    image: ubuntu/squid:latest
+    container_name: netguard-proxy
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - ./squid_config:/etc/squid
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  netguard-network:
+    driver: bridge
